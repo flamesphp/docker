@@ -1,0 +1,66 @@
+services:
+
+  apache-php:
+    build:
+      context: resources/apache-php
+    container_name: ${APP_NAME:-flames}-apache-php
+    restart: unless-stopped
+    volumes:
+      - ../../../:/var/www/html
+    ports:
+      - "${APP_FORWARDED_PORT:-8080}:${APP_PORT:-80}"
+    depends_on:
+      - mysql
+    networks:
+      - flames
+
+  mysql:
+    image: mysql:8.0
+    container_name: ${APP_NAME:-flames}-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DATABASE_MARIADB_PASSWORD:-root}
+      MYSQL_DATABASE: ${DATABASE_MARIADB_NAME:-flames}
+      MYSQL_USER: ${DATABASE_MARIADB_USER:-flames}
+      MYSQL_PASSWORD: ${DATABASE_MARIADB_PASSWORD:-root}
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./resources/mysql/my.cnf:/etc/mysql/conf.d/flames.cnf
+    ports:
+      - "${DATABASE_MARIADB_PORT:-3306}:3306"
+    networks:
+      - flames
+
+  # ── Nginx + PHP-FPM (alternative to apache-php) ──────────────────────────
+  # To use this setup: remove the apache-php service above and uncomment below.
+
+  # nginx:
+  #   image: nginx:alpine
+  #   container_name: ${APP_NAME:-flames}-nginx
+  #   restart: unless-stopped
+  #   volumes:
+  #     - ../../../:/var/www/html
+  #     - ./resources/nginx/default.conf:/etc/nginx/conf.d/default.conf
+  #   ports:
+  #     - "${APP_FORWARDED_PORT:-8080}:${APP_PORT:-80}"
+  #   depends_on:
+  #     - php-fpm
+  #   networks:
+  #     - flames
+
+  # php-fpm:
+  #   build:
+  #     context: resources/php-fpm
+  #   container_name: ${APP_NAME:-flames}-php-fpm
+  #   restart: unless-stopped
+  #   volumes:
+  #     - ../../../:/var/www/html
+  #   networks:
+  #     - flames
+
+networks:
+  flames:
+    driver: bridge
+
+volumes:
+  mysql_data:

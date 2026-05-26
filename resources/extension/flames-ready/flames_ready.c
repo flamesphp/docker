@@ -36,6 +36,7 @@
 #include <errno.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/wait.h>
 #include "php_flames_ready.h"
 #include "SAPI.h"
 #include "zend_smart_str.h"
@@ -67,6 +68,10 @@ PHP_INI_BEGIN()
         "flames_ready.socket", "/var/run/flames-ready/worker.sock",
         PHP_INI_SYSTEM, OnUpdateString,
         socket_path, zend_flames_ready_globals, flames_ready_globals)
+    STD_PHP_INI_ENTRY(
+        "flames_ready.workers", "0",
+        PHP_INI_SYSTEM, OnUpdateLong,
+        workers, zend_flames_ready_globals, flames_ready_globals)
 PHP_INI_END()
 
 /* =========================================================================
@@ -248,30 +253,131 @@ PHP_FUNCTION(xflames_ready_register_load)
  *
  * Returns the total number of requests handled when the loop ends.
  */
+/* Worker accept loop – runs inside each forked child process.
+ * Never returns under normal operation; exits via _exit() when done. */
+static void flames_ready_worker_loop(int server_fd, zval *handler)
+{
+    zend_long max     = FLAMES_READY_G(max_requests);
+    zend_long handled = 0;
+
+    /* Each child invokes its own load callbacks once. */
+    if (!FLAMES_READY_G(initialized)) {
+        flames_ready_invoke_callbacks(
+            FLAMES_READY_G(load_callbacks),
+            FLAMES_READY_G(load_count),
+            "load");
+        FLAMES_READY_G(initialized) = 1;
+    }
+
+    while (1) {
+        if (max > 0 && handled >= max) break;
+
+        int conn_fd = flames_ready_fcgi_accept(server_fd);
+        if (conn_fd < 0) { usleep(10000); continue; }
+
+        flames_ready_fcgi_request_t req;
+        if (flames_ready_fcgi_read_request(conn_fd, &req) < 0) {
+            close(conn_fd); continue;
+        }
+
+        flames_ready_fcgi_populate_globals(&req);
+        php_output_start_user(NULL, 0, PHP_OUTPUT_HANDLER_STDFLAGS);
+
+        zval retval;
+        ZVAL_UNDEF(&retval);
+        call_user_function(NULL, NULL, handler, &retval, 0, NULL);
+        zval_ptr_dtor(&retval);
+
+        if (EG(exception)) zend_clear_exception();
+
+        zval ob_content;
+        ZVAL_UNDEF(&ob_content);
+        php_output_get_contents(&ob_content);
+        php_output_discard();
+
+        const char *body     = "";
+        size_t      body_len = 0;
+        if (Z_TYPE(ob_content) == IS_STRING) {
+            body     = Z_STRVAL(ob_content);
+            body_len = Z_STRLEN(ob_content);
+        }
+
+        smart_str headers_buf = {0};
+        int status_code = SG(sapi_headers).http_response_code;
+        if (status_code == 0) status_code = 200;
+        smart_str_append_printf(&headers_buf, "Status: %d\r\n", status_code);
+
+        zend_bool has_ct = 0;
+        zend_llist_element *el;
+        for (el = SG(sapi_headers).headers.head; el; el = el->next) {
+            sapi_header_struct *sh = (sapi_header_struct *)el->data;
+            smart_str_appendl(&headers_buf, sh->header, sh->header_len);
+            smart_str_appendl(&headers_buf, "\r\n", 2);
+            if (strncasecmp(sh->header, "Content-Type", 12) == 0) has_ct = 1;
+        }
+        if (!has_ct)
+            smart_str_appends(&headers_buf, "Content-Type: text/html; charset=UTF-8\r\n");
+        smart_str_append_printf(&headers_buf, "Content-Length: %zu\r\n", body_len);
+        smart_str_0(&headers_buf);
+
+        flames_ready_fcgi_send_response(
+            conn_fd, req.request_id,
+            ZSTR_VAL(headers_buf.s), ZSTR_LEN(headers_buf.s),
+            body, body_len);
+
+        smart_str_free(&headers_buf);
+        zval_ptr_dtor(&ob_content);
+        flames_ready_fcgi_request_free(&req);
+        close(conn_fd);
+
+        sapi_header_op(SAPI_HEADER_DELETE_ALL, NULL);
+        SG(sapi_headers).http_response_code = 0;
+
+        flames_ready_invoke_callbacks(
+            FLAMES_READY_G(reset_callbacks),
+            FLAMES_READY_G(reset_count),
+            "reset");
+
+        handled++;
+        FLAMES_READY_G(request_count)++;
+    }
+}
+
+/* Fork one worker child; returns the child PID (in parent) or does not
+ * return at all (child runs the accept loop and exits). */
+static pid_t flames_ready_spawn_worker(int server_fd, zval *handler)
+{
+    pid_t pid = fork();
+    if (pid < 0) return -1; /* fork failed */
+
+    if (pid == 0) {
+        /* ── Child process ─────────────────────────────────────────── */
+        flames_ready_worker_loop(server_fd, handler);
+        _exit(0);
+    }
+
+    /* Parent: return child PID */
+    return pid;
+}
+
 PHP_FUNCTION(xflames_ready_handle_request)
 {
-    zval      *handler;
-    zend_long  max;
-    zend_long  handled = 0;
+    zval *handler;
 
     ZEND_PARSE_PARAMETERS_START(1, 1)
         Z_PARAM_ZVAL(handler)
     ZEND_PARSE_PARAMETERS_END();
 
     if (!zend_is_callable(handler, 0, NULL)) {
-        zend_throw_exception_ex(
-            zend_ce_type_error, 0,
+        zend_throw_exception_ex(zend_ce_type_error, 0,
             "Flames Ready: argument must be callable");
         RETURN_FALSE;
     }
 
-    /* Open FastCGI socket FIRST – retry up to 30s so a fast container
-     * restart doesn't fail while the previous instance's port is still
-     * in TIME_WAIT.  Only then run load callbacks so logs aren't misleading. */
+    /* ── Open the shared FastCGI socket (parent only, before forking) ── */
     const char *sock_path = FLAMES_READY_G(socket_path);
-    if (!sock_path || sock_path[0] == '\0') {
+    if (!sock_path || sock_path[0] == '\0')
         sock_path = "/var/run/flames-ready/worker.sock";
-    }
 
     int server_fd = -1;
     int bind_tries = 30;
@@ -290,121 +396,55 @@ PHP_FUNCTION(xflames_ready_handle_request)
         RETURN_FALSE;
     }
 
-    /* Invoke load callbacks once (socket is ready, worker is stable) */
-    if (!FLAMES_READY_G(initialized)) {
-        if (flames_ready_invoke_callbacks(
-                FLAMES_READY_G(load_callbacks),
-                FLAMES_READY_G(load_count),
-                "load") == FAILURE) {
-            close(server_fd);
-            RETURN_FALSE;
-        }
-        FLAMES_READY_G(initialized) = 1;
+    /* ── Determine worker count ─────────────────────────────────────── */
+    int num_workers = (int)FLAMES_READY_G(workers);
+    if (num_workers <= 0) {
+        /* 0 = auto: one worker per logical CPU */
+        long cpus = sysconf(_SC_NPROCESSORS_ONLN);
+        num_workers = (cpus > 0) ? (int)cpus : 4;
     }
 
-    max = FLAMES_READY_G(max_requests);
+    /* ── Fork all workers ───────────────────────────────────────────── */
+    pid_t *pids = emalloc((size_t)num_workers * sizeof(pid_t));
+    for (int i = 0; i < num_workers; i++) {
+        pids[i] = flames_ready_spawn_worker(server_fd, handler);
+        if (pids[i] < 0) {
+            php_error_docref(NULL, E_WARNING,
+                "Flames Ready: fork() failed for worker %d: %s",
+                i, strerror(errno));
+        }
+    }
 
+    fprintf(stderr,
+        "[Flames Ready] supervisor pid %d – spawned %d worker(s) on '%s'\n",
+        (int)getpid(), num_workers, sock_path);
+    fflush(stderr);
+
+    /* ── Supervisor loop: monitor and respawn dead workers ──────────── */
     while (1) {
-        if (max > 0 && handled >= max) break;
-
-        /* ── Accept one FastCGI connection ─────────────────────────── */
-        int conn_fd = flames_ready_fcgi_accept(server_fd);
-        if (conn_fd < 0) {
-            /* EINTR = interrupted by signal (e.g. PHP watchdog timer); retry.
-             * Any other error is transient – sleep briefly and retry instead
-             * of exiting, so the worker stays alive for the next request. */
-            usleep(10000); /* 10 ms */
-            continue;
+        int   status;
+        pid_t died = waitpid(-1, &status, 0);
+        if (died < 0) {
+            if (errno == EINTR) continue;
+            break; /* no more children */
         }
 
-        /* ── Read the full FastCGI request ─────────────────────────── */
-        flames_ready_fcgi_request_t req;
-        if (flames_ready_fcgi_read_request(conn_fd, &req) < 0) {
-            close(conn_fd);
-            continue;
+        /* Find the slot and replace the dead worker */
+        for (int i = 0; i < num_workers; i++) {
+            if (pids[i] == died) {
+                fprintf(stderr,
+                    "[Flames Ready] worker pid %d exited – respawning...\n",
+                    (int)died);
+                fflush(stderr);
+                pids[i] = flames_ready_spawn_worker(server_fd, handler);
+                break;
+            }
         }
-
-        /* ── Populate PHP superglobals ──────────────────────────────── */
-        flames_ready_fcgi_populate_globals(&req);
-
-        /* ── Start output buffering ─────────────────────────────────── */
-        php_output_start_user(NULL, 0, PHP_OUTPUT_HANDLER_STDFLAGS);
-
-        /* ── Call the user handler ──────────────────────────────────── */
-        zval retval;
-        ZVAL_UNDEF(&retval);
-        call_user_function(NULL, NULL, handler, &retval, 0, NULL);
-        zval_ptr_dtor(&retval);
-
-        /* Clear any uncaught exception so the worker stays alive */
-        if (EG(exception)) {
-            zend_clear_exception();
-        }
-
-        /* ── Capture output buffer ──────────────────────────────────── */
-        zval ob_content;
-        ZVAL_UNDEF(&ob_content);
-        php_output_get_contents(&ob_content);
-        php_output_discard();
-
-        const char *body     = "";
-        size_t      body_len = 0;
-        if (Z_TYPE(ob_content) == IS_STRING) {
-            body     = Z_STRVAL(ob_content);
-            body_len = Z_STRLEN(ob_content);
-        }
-
-        /* ── Build response headers from SG(sapi_headers) ──────────── */
-        smart_str headers_buf = {0};
-
-        int status_code = SG(sapi_headers).http_response_code;
-        if (status_code == 0) status_code = 200;
-        smart_str_append_printf(&headers_buf, "Status: %d\r\n", status_code);
-
-        zend_bool has_ct = 0;
-        zend_llist_element *el;
-        for (el = SG(sapi_headers).headers.head; el; el = el->next) {
-            sapi_header_struct *sh = (sapi_header_struct *)el->data;
-            smart_str_appendl(&headers_buf, sh->header, sh->header_len);
-            smart_str_appendl(&headers_buf, "\r\n", 2);
-            if (strncasecmp(sh->header, "Content-Type", 12) == 0) has_ct = 1;
-        }
-        if (!has_ct) {
-            smart_str_appends(&headers_buf,
-                "Content-Type: text/html; charset=UTF-8\r\n");
-        }
-        smart_str_append_printf(&headers_buf,
-            "Content-Length: %zu\r\n", body_len);
-        smart_str_0(&headers_buf);
-
-        /* ── Send FastCGI response ───────────────────────────────────── */
-        flames_ready_fcgi_send_response(
-            conn_fd, req.request_id,
-            ZSTR_VAL(headers_buf.s), ZSTR_LEN(headers_buf.s),
-            body, body_len);
-
-        /* ── Cleanup ────────────────────────────────────────────────── */
-        smart_str_free(&headers_buf);
-        zval_ptr_dtor(&ob_content);
-        flames_ready_fcgi_request_free(&req);
-        close(conn_fd);
-
-        /* Clear SAPI headers for next request */
-        sapi_header_op(SAPI_HEADER_DELETE_ALL, NULL);
-        SG(sapi_headers).http_response_code = 0;
-
-        /* ── Call reset callbacks ────────────────────────────────────── */
-        flames_ready_invoke_callbacks(
-            FLAMES_READY_G(reset_callbacks),
-            FLAMES_READY_G(reset_count),
-            "reset");
-
-        handled++;
-        FLAMES_READY_G(request_count)++;
     }
 
     close(server_fd);
-    RETURN_LONG(handled);
+    efree(pids);
+    RETURN_LONG(0);
 }
 /* }}} */
 
@@ -450,6 +490,7 @@ PHP_GINIT_FUNCTION(flames_ready)
     flames_ready_globals->max_requests    = 0;
     flames_ready_globals->request_count   = 0;
     flames_ready_globals->socket_path     = NULL;
+    flames_ready_globals->workers         = 0;
 }
 /* }}} */
 

@@ -69,6 +69,7 @@ ZEND_BEGIN_MODULE_GLOBALS(flames_ready)
     zend_long  max_requests;   /* INI: flames_ready.max_requests (0 = inf) */
     zend_long  request_count;  /* total requests handled by this worker    */
     char      *socket_path;    /* INI: flames_ready.socket                 */
+    zend_long  workers;        /* INI: flames_ready.workers (0 = auto)     */
 ZEND_END_MODULE_GLOBALS(flames_ready)
 
 #define FLAMES_READY_G(v) ZEND_MODULE_GLOBALS_ACCESSOR(flames_ready, v)

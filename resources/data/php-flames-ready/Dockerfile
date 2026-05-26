@@ -1,4 +1,4 @@
-FROM php:8.3-fpm
+FROM php:8.5-cli
 USER root
 
 RUN apt-get update
@@ -22,9 +22,9 @@ RUN apt-get install -y libpng-dev
 RUN apt-get install -y libzip-dev
 RUN apt-get install -y libicu-dev
 RUN apt-get install -y libxslt-dev
-RUN apt-get install -y libc-client-dev
-RUN apt-get install -y libkrb5-dev
 RUN apt-get install -y g++
+RUN apt-get install -y autoconf
+RUN apt-get install -y make
 
 # Install PHP Extensions (default)
 RUN docker-php-ext-install -j$(nproc) iconv
@@ -33,7 +33,6 @@ RUN docker-php-ext-install pdo
 RUN docker-php-ext-install pdo_mysql
 RUN docker-php-ext-install zip
 RUN docker-php-ext-install bz2
-RUN docker-php-ext-install opcache
 RUN docker-php-ext-install pcntl
 RUN docker-php-ext-install mbstring
 RUN docker-php-ext-install exif
@@ -53,14 +52,23 @@ RUN docker-php-ext-install -j$(nproc) intl
 #RUN pecl install xdebug
 #RUN docker-php-ext-enable xdebug
 
-# Install Composer
-RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
-
-# Install TesseractOCR
-RUN apt-get install -y tesseract-ocr
-
 # PHP INI
-COPY php.ini /usr/local/etc/php/conf.d/z-flames.ini
+COPY data/php-flames-ready/php.ini /usr/local/etc/php/conf.d/z-flames.ini
+
+# Flames Ready extension
+COPY extension/flames-ready /usr/src/flames-ready
+RUN cd /usr/src/flames-ready \
+    && phpize \
+    && ./configure --enable-flames-ready \
+    && make -j$(nproc) \
+    && make install \
+    && rm -rf /usr/src/flames-ready
+
+RUN echo "extension=flames_ready.so"           >  /usr/local/etc/php/conf.d/50-flames-ready.ini \
+ && echo "flames_ready.worker_mode  = 1"        >> /usr/local/etc/php/conf.d/50-flames-ready.ini \
+ && echo "flames_ready.preload_once = 1"        >> /usr/local/etc/php/conf.d/50-flames-ready.ini \
+ && echo "flames_ready.max_requests = 0"        >> /usr/local/etc/php/conf.d/50-flames-ready.ini \
+ && echo "flames_ready.socket       = 9001"     >> /usr/local/etc/php/conf.d/50-flames-ready.ini
 
 # Clear cache
 RUN apt-get clean && rm -rf /var/lib/apt/lists/*

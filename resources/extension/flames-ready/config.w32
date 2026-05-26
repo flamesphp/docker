@@ -1,0 +1,13 @@
+// config.w32 - Flames Ready PHP Extension - Windows build configuration
+//
+// Usage (from PHP SDK shell):
+//   buildconf
+//   configure --enable-flames-ready
+//   nmake
+
+ARG_ENABLE("flames-ready", "Enable Flames Ready persistent worker extension", "no");
+
+if (PHP_FLAMES_READY != "no") {
+    EXTENSION("flames_ready", "flames_ready.c");
+    AC_DEFINE("HAVE_FLAMES_READY", 1, "Flames Ready extension");
+}

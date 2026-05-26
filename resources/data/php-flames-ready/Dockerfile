@@ -69,7 +69,9 @@ RUN echo "extension=flames_ready.so"           >  /usr/local/etc/php/conf.d/50-f
  && echo "flames_ready.preload_once = 1"        >> /usr/local/etc/php/conf.d/50-flames-ready.ini \
  && echo "flames_ready.max_requests = 0"        >> /usr/local/etc/php/conf.d/50-flames-ready.ini \
  && echo "flames_ready.socket       = 9001"     >> /usr/local/etc/php/conf.d/50-flames-ready.ini \
- && echo "flames_ready.workers      = 0"        >> /usr/local/etc/php/conf.d/50-flames-ready.ini
+ && echo "flames_ready.workers        = 0"        >> /usr/local/etc/php/conf.d/50-flames-ready.ini \
+ && echo "flames_ready.worker_ttl     = 300"      >> /usr/local/etc/php/conf.d/50-flames-ready.ini \
+ && echo "flames_ready.worker_timeout = 900"      >> /usr/local/etc/php/conf.d/50-flames-ready.ini
 
 # Clear cache
 RUN apt-get clean && rm -rf /var/lib/apt/lists/*

@@ -53,7 +53,8 @@ RUN docker-php-ext-install -j$(nproc) intl
 #RUN docker-php-ext-enable xdebug
 
 # PHP INI
-COPY data/php-flames-ready/php.ini /usr/local/etc/php/conf.d/z-flames.ini
+COPY data/php-flames-ready/php.ini /usr/local/etc/php/conf.d/za-flames.ini
+COPY data/php-flames-ready/php-flames-ready.ini /usr/local/etc/php/conf.d/zz-flames-ready.ini
 
 # Flames Ready extension
 COPY extension/flames-ready /usr/src/flames-ready
@@ -63,15 +64,6 @@ RUN cd /usr/src/flames-ready \
     && make -j$(nproc) \
     && make install \
     && rm -rf /usr/src/flames-ready
-
-RUN echo "extension=flames_ready.so"           >  /usr/local/etc/php/conf.d/50-flames-ready.ini \
- && echo "flames_ready.worker_mode  = 1"        >> /usr/local/etc/php/conf.d/50-flames-ready.ini \
- && echo "flames_ready.preload_once = 1"        >> /usr/local/etc/php/conf.d/50-flames-ready.ini \
- && echo "flames_ready.max_requests = 0"        >> /usr/local/etc/php/conf.d/50-flames-ready.ini \
- && echo "flames_ready.socket       = 9001"     >> /usr/local/etc/php/conf.d/50-flames-ready.ini \
- && echo "flames_ready.workers        = 0"        >> /usr/local/etc/php/conf.d/50-flames-ready.ini \
- && echo "flames_ready.worker_ttl     = 300"      >> /usr/local/etc/php/conf.d/50-flames-ready.ini \
- && echo "flames_ready.worker_timeout = 900"      >> /usr/local/etc/php/conf.d/50-flames-ready.ini
 
 # Clear cache
 RUN apt-get clean && rm -rf /var/lib/apt/lists/*

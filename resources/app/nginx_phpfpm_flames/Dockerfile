@@ -40,6 +40,9 @@ RUN apt-get install -y --no-install-recommends php8.5-zip
 RUN echo "Kernel: Install MongoDB extension"
 RUN apt-get install -y --no-install-recommends php8.5-mongodb
 
+RUN echo "Kernel: Install RocksDB"
+RUN apt-get install -y --no-install-recommends librocksdb-dev
+
 RUN echo "Kernel: Install extra extensions"
 RUN apt-get install -y --no-install-recommends php8.5-igbinary
 RUN apt-get install -y --no-install-recommends php8.5-redis

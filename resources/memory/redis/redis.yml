@@ -1,0 +1,28 @@
+services:
+  redis:
+    image: redis:7.4
+    restart: unless-stopped
+    command: >
+      redis-server /etc/redis/flames.conf
+      --maxmemory ${DATABASE_MEMORY_REDIS_MAX_MEMORY:-256mb}
+      --requirepass ${DATABASE_MEMORY_REDIS_PASSWORD}
+    ports:
+      - "${DATABASE_MEMORY_REDIS_PORT:-${DATABASE_MEMORY_REDIS_PORT_FORWARDED:-6380}}:6379"
+    volumes:
+      - redis:/data
+      - ./vendor/flamesphp/docker/resources/memory/redis/redis.conf:/etc/redis/flames.conf:ro
+    networks:
+      - flames
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${DATABASE_MEMORY_REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  redis:

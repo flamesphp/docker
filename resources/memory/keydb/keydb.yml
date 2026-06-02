@@ -1,0 +1,28 @@
+services:
+  keydb:
+    image: eqalpha/keydb:x86_64_v6.3.4
+    restart: unless-stopped
+    command: >
+      keydb-server /etc/keydb/flames.conf
+      --maxmemory ${DATABASE_MEMORY_KEYDB_MAX_MEMORY:-256mb}
+      --requirepass ${DATABASE_MEMORY_KEYDB_PASSWORD}
+    ports:
+      - "${DATABASE_MEMORY_KEYDB_PORT:-${DATABASE_MEMORY_KEYDB_PORT_FORWARDED:-6379}}:6379"
+    volumes:
+      - keydb:/data
+      - ./vendor/flamesphp/docker/resources/memory/keydb/keydb.conf:/etc/keydb/flames.conf:ro
+    networks:
+      - flames
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    healthcheck:
+      test: ["CMD", "keydb-cli", "-a", "${DATABASE_MEMORY_KEYDB_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  keydb:

@@ -1,0 +1,28 @@
+services:
+  meilisearch:
+    image: getmeili/meilisearch:v1.44.0
+    restart: unless-stopped
+    environment:
+      MEILI_MASTER_KEY: ${DATABASE_SEARCH_MEILISEARCH_KEY}
+      MEILI_ENV: production
+      MEILI_DB_PATH: /meili_data
+      MEILI_MAX_INDEXING_MEMORY: ${DATABASE_SEARCH_MEILISEARCH_MAX_INDEXING_MEMORY:-256Mb}
+    ports:
+      - "${DATABASE_SEARCH_MEILISEARCH_PORT:-${DATABASE_SEARCH_MEILISEARCH_PORT_FORWARDED:-7700}}:7700"
+    volumes:
+      - meilisearch:/meili_data
+    networks:
+      - flames
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:7700/health | grep -q '\"status\":\"available\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  meilisearch:

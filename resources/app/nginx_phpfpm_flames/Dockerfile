@@ -74,21 +74,21 @@ RUN openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
 
 RUN echo "Nginx: Inject configuration"
 RUN rm -f /etc/nginx/sites-enabled/default
-COPY vendor/flamesphp/docker/resource/image/nginx_phpfpm_flames/nginx-main.conf /etc/nginx/nginx.conf
-COPY vendor/flamesphp/docker/resource/image/nginx_phpfpm_flames/nginx.conf /etc/nginx/sites-available/flames.conf
+COPY vendor/flamesphp/docker/resources/app/nginx_phpfpm_flames/nginx-main.conf /etc/nginx/nginx.conf
+COPY vendor/flamesphp/docker/resources/app/nginx_phpfpm_flames/nginx.conf /etc/nginx/sites-available/flames.conf
 RUN ln -s /etc/nginx/sites-available/flames.conf /etc/nginx/sites-enabled/flames.conf
 
-COPY vendor/flamesphp/docker/resource/image/nginx_phpfpm_flames/opcache.ini /etc/php/8.5/fpm/conf.d/99-opcache-settings.ini
-COPY vendor/flamesphp/docker/resource/image/nginx_phpfpm_flames/opcache.ini /etc/php/8.5/cli/conf.d/99-opcache-settings.ini
-COPY vendor/flamesphp/docker/resource/image/nginx_phpfpm_flames/performance.ini /etc/php/8.5/fpm/conf.d/98-performance.ini
-COPY vendor/flamesphp/docker/resource/image/nginx_phpfpm_flames/performance.ini /etc/php/8.5/cli/conf.d/98-performance.ini
-COPY vendor/flamesphp/docker/resource/image/nginx_phpfpm_flames/php-fpm-pool.conf /etc/php/8.5/fpm/pool.d/www.conf
-COPY vendor/flamesphp/docker/resource/image/nginx_phpfpm_flames/cron.sh /usr/local/bin/flames-cron
+COPY vendor/flamesphp/docker/resources/app/nginx_phpfpm_flames/opcache.ini /etc/php/8.5/fpm/conf.d/99-opcache-settings.ini
+COPY vendor/flamesphp/docker/resources/app/nginx_phpfpm_flames/opcache.ini /etc/php/8.5/cli/conf.d/99-opcache-settings.ini
+COPY vendor/flamesphp/docker/resources/app/nginx_phpfpm_flames/performance.ini /etc/php/8.5/fpm/conf.d/98-performance.ini
+COPY vendor/flamesphp/docker/resources/app/nginx_phpfpm_flames/performance.ini /etc/php/8.5/cli/conf.d/98-performance.ini
+COPY vendor/flamesphp/docker/resources/app/nginx_phpfpm_flames/php-fpm-pool.conf /etc/php/8.5/fpm/pool.d/www.conf
+COPY vendor/flamesphp/docker/resources/app/nginx_phpfpm_flames/cron.sh /usr/local/bin/flames-cron
 RUN chmod +x /usr/local/bin/flames-cron
 RUN printf '* * * * * root /usr/local/bin/flames-cron\n' > /etc/cron.d/flames
 RUN chmod 0644 /etc/cron.d/flames
 
-COPY vendor/flamesphp/docker/resource/image/nginx_phpfpm_flames/start.sh /start.sh
+COPY vendor/flamesphp/docker/resources/app/nginx_phpfpm_flames/start.sh /start.sh
 RUN chmod +x /start.sh
 
 WORKDIR /var/www/html

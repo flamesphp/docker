@@ -1,0 +1,32 @@
+services:
+  mysql:
+    image: mysql:9.7
+    restart: unless-stopped
+    command: >
+      --innodb-buffer-pool-size=${DATABASE_MYSQL_BUFFER_POOL_SIZE:-256M}
+      --max-connections=${DATABASE_MYSQL_MAX_CONNECTIONS:-1000}
+    environment:
+      MYSQL_DATABASE: ${DATABASE_MYSQL_NAME}
+      MYSQL_USER: ${DATABASE_MYSQL_USER}
+      MYSQL_PASSWORD: ${DATABASE_MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${DATABASE_MYSQL_PASSWORD}
+    ports:
+      - "${DATABASE_MYSQL_PORT:-${DATABASE_MYSQL_PORT_FORWARDED:-3307}}:3306"
+    volumes:
+      - mysql:/var/lib/mysql
+      - ./vendor/flamesphp/docker/resources/database/mysql/my.cnf:/etc/mysql/conf.d/flames.cnf:ro
+    networks:
+      - flames
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DATABASE_MYSQL_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  mysql:

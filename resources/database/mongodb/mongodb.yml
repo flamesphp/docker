@@ -1,0 +1,32 @@
+services:
+  mongodb:
+    image: mongo:8.3
+    restart: unless-stopped
+    command: >
+      mongod
+      --config /etc/mongod.conf
+      --wiredTigerCacheSizeGB ${DATABASE_MONGODB_CACHE_SIZE_GB:-0.25}
+    environment:
+      MONGO_INITDB_DATABASE: ${DATABASE_MONGODB_NAME}
+      MONGO_INITDB_ROOT_USERNAME: ${DATABASE_MONGODB_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${DATABASE_MONGODB_PASSWORD}
+    ports:
+      - "${DATABASE_MONGODB_PORT:-${DATABASE_MONGODB_PORT_FORWARDED:-27017}}:27017"
+    volumes:
+      - mongodb:/data/db
+      - ./vendor/flamesphp/docker/resources/database/mongodb/mongod.conf:/etc/mongod.conf:ro
+    networks:
+      - flames
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  mongodb:

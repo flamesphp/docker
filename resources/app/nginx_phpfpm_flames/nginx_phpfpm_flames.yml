@@ -3,7 +3,7 @@ services:
   app:
     build:
       context: .
-      dockerfile: vendor/flamesphp/docker/resource/image/nginx_phpfpm_flames/Dockerfile
+      dockerfile: vendor/flamesphp/docker/resources/app/nginx_phpfpm_flames/Dockerfile
     restart: unless-stopped
     volumes:
       - .:/var/www/html

@@ -95,7 +95,8 @@ RUN ln -s /etc/nginx/sites-available/flames.conf /etc/nginx/sites-enabled/flames
 COPY vendor/flamesphp/docker/resources/app/nginx_flames/opcache.ini /etc/php/8.5/cli/conf.d/99-opcache-settings.ini
 COPY vendor/flamesphp/docker/resources/app/nginx_flames/performance.ini /etc/php/8.5/cli/conf.d/98-performance.ini
 COPY vendor/flamesphp/docker/resources/app/nginx_flames/cron.sh /usr/local/bin/flames-cron
-RUN chmod +x /usr/local/bin/flames-cron
+COPY vendor/flamesphp/docker/resources/app/nginx_flames/ready-watchdog.sh /usr/local/bin/flames-ready-watchdog
+RUN chmod +x /usr/local/bin/flames-cron /usr/local/bin/flames-ready-watchdog
 RUN printf '* * * * * root /usr/local/bin/flames-cron\n' > /etc/cron.d/flames
 RUN chmod 0644 /etc/cron.d/flames
 

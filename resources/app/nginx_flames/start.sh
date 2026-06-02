@@ -12,6 +12,7 @@ EOF
 
 cron
 
-cd /var/www/html && /usr/bin/php8.5 ./forge --ready >> /proc/1/fd/1 2>> /proc/1/fd/2 &
+/usr/local/bin/flames-ready-watchdog >> /proc/1/fd/1 2>> /proc/1/fd/2 &
+cd /var/www/html && /usr/bin/php8.5 ./forge --cron --observer >> /proc/1/fd/1 2>> /proc/1/fd/2 &
 
 exec nginx -g 'daemon off;'

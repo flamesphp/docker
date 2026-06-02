@@ -22,10 +22,10 @@ class Docker
             return self::$isDocker;
         }
 
-        if (Os::isUnix() === false) {
-            self::$isDocker = false;
-            return self::$isDocker;
-        }
+//        if (Os::isUnix() === false) {
+//            self::$isDocker = false;
+//            return self::$isDocker;
+//        }
 
         self::$isDocker = file_exists('/.dockerenv');
         return self::$isDocker;

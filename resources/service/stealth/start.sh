@@ -8,6 +8,7 @@ CDP_INTERNAL=9223
 CDP_EXTERNAL=9222
 CDP_PORT="${STEALTH_REMOTE_PORT:-9222}"
 AUDIO_PORT="${STEALTH_AUDIO_PORT:-8090}"
+CURSOR_PORT="${STEALTH_CURSOR_PORT:-9230}"
 SCREEN="1920x1080x24"
 
 FLAMES_USER="flames"
@@ -23,6 +24,7 @@ cleanup_stale_processes() {
     pkill -f "socat TCP4-LISTEN:${CDP_EXTERNAL}" 2>/dev/null || true
     pkill -u "${FLAMES_USER}" -f "ffmpeg.*${AUDIO_PORT}/stream.pcm" 2>/dev/null || true
     pkill -f "/tab-guard.sh" 2>/dev/null || true
+    pkill -f "/cursor-server.py" 2>/dev/null || true
     pkill -u "${FLAMES_USER}" -f "ffmpeg.*${PULSE_SINK_NAME}.monitor" 2>/dev/null || true
     runuser -u "${FLAMES_USER}" -- pulseaudio --kill 2>/dev/null || true
     pkill -u "${FLAMES_USER}" -x chromium 2>/dev/null || true
@@ -54,6 +56,7 @@ x11vnc \
     -forever \
     -shared \
     -clip clipboard \
+    -cursor most \
     -rfbport "${VNC_PORT}" \
     -listen 0.0.0.0 \
     -bg \
@@ -83,5 +86,8 @@ export PROFILE_DIR="${PROFILE_DIR}"
 /chromium-launch.sh &
 
 /tab-guard.sh "${CDP_INTERNAL}" &
+
+export STEALTH_CURSOR_PORT="${CURSOR_PORT}"
+python3 /cursor-server.py &
 
 exec nginx -g 'daemon off;'

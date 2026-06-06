@@ -30,6 +30,9 @@ RUN apt-get update \
         fonts-liberation \
         fonts-noto-color-emoji \
         ca-certificates \
+        xdotool \
+        python3 \
+        python3-websockets \
     && rm -rf /var/lib/apt/lists/* \
     && rm -f /etc/nginx/sites-enabled/default \
     && rm -f /etc/chromium/master_preferences
@@ -52,10 +55,11 @@ COPY vendor/flamesphp/docker/resources/service/stealth/pulse-setup.sh /pulse-set
 COPY vendor/flamesphp/docker/resources/service/stealth/pulse-start-flames.sh /pulse-start-flames.sh
 COPY vendor/flamesphp/docker/resources/service/stealth/run-as-flames.sh /run-as-flames.sh
 COPY vendor/flamesphp/docker/resources/service/stealth/audio-stream.sh /audio-stream.sh
+COPY vendor/flamesphp/docker/resources/service/stealth/cursor-server.py /cursor-server.py
 
-RUN chmod +x /start.sh /tab-guard.sh /chromium-launch.sh /pulse-setup.sh /pulse-start-flames.sh /run-as-flames.sh /audio-stream.sh
+RUN chmod +x /start.sh /tab-guard.sh /chromium-launch.sh /pulse-setup.sh /pulse-start-flames.sh /run-as-flames.sh /audio-stream.sh /cursor-server.py
 
-EXPOSE 9222 5900 6080 8090
+EXPOSE 9222 5900 6080 8090 9230
 
 ENTRYPOINT ["/usr/bin/tini", "--"]
 CMD ["/start.sh"]

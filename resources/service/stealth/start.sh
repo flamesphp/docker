@@ -29,6 +29,7 @@ cleanup_stale_processes() {
     runuser -u "${FLAMES_USER}" -- pulseaudio --kill 2>/dev/null || true
     pkill -u "${FLAMES_USER}" -x chromium 2>/dev/null || true
 
+    rm -rf /tmp/org.chromium.Chromium.* /tmp/.org.chromium.Chromium.* 2>/dev/null || true
     rm -f "/tmp/.X${DISPLAY_NUM}-lock"
     rm -f "/tmp/.X11-unix/X${DISPLAY_NUM}"
     rm -rf "${PULSE_RUNTIME}"
@@ -78,12 +79,14 @@ mkdir -p "${PROFILE_DIR}/Default"
 cp /opt/flames-chromium/Default/Preferences "${PROFILE_DIR}/Default/Preferences"
 cp /opt/flames-chromium/Default/Bookmarks "${PROFILE_DIR}/Default/Bookmarks"
 cp /opt/flames-chromium/local-state.json "${PROFILE_DIR}/Local State"
+/chromium-profile-cleanup.sh "${PROFILE_DIR}"
 chown -R "${FLAMES_USER}:${FLAMES_USER}" "${PROFILE_DIR}"
 
 export CDP_INTERNAL="${CDP_INTERNAL}"
 export PROFILE_DIR="${PROFILE_DIR}"
 
 /chromium-launch.sh &
+python3 /dismiss-theme-bar.py &
 
 /tab-guard.sh "${CDP_INTERNAL}" &
 

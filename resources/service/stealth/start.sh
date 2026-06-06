@@ -44,7 +44,7 @@ export PULSE_SOCKET="${PULSE_SOCKET}"
 
 source /pulse-setup.sh
 
-Xvfb ":${DISPLAY_NUM}" -screen 0 "${SCREEN}" -ac +extension GLX +render -noreset &
+Xvfb ":${DISPLAY_NUM}" -screen 0 "${SCREEN}" -ac +extension GLX +render +extension SHAPE -noreset &
 sleep 1
 
 autocutsel -fork
@@ -88,6 +88,21 @@ export PROFILE_DIR="${PROFILE_DIR}"
 /tab-guard.sh "${CDP_INTERNAL}" &
 
 export STEALTH_CURSOR_PORT="${CURSOR_PORT}"
-python3 /cursor-server.py &
+
+if ! python3 -c "from PIL import Image; from Xlib import display" 2>/dev/null; then
+    echo "cursor-server: installing python3-pil python3-xlib..." >&2
+    apt-get update -qq
+    apt-get install -y -qq python3-pil python3-xlib
+fi
+
+# Start cursor-server after Chromium CDP is up (overlay must stack above the browser).
+for _ in $(seq 1 30); do
+    if curl -sf "http://127.0.0.1:${CDP_INTERNAL}/json/version" >/dev/null 2>&1; then
+        break
+    fi
+    sleep 1
+done
+
+/run-as-flames.sh python3 /cursor-server.py &
 
 exec nginx -g 'daemon off;'

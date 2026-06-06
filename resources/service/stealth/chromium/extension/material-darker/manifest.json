@@ -1,0 +1,45 @@
+{
+"update_url": "https://clients2.google.com/service/update2/crx",
+
+  "manifest_version" : 3,
+  "name" : "Material Darker",
+  "description" : "Material Darker Theme",
+  "version" : "2.4",
+  "author" : "Mallowigi",
+  "icons" : {
+    "128" : "icon.png"
+  },
+  "theme" : {
+    "images" : {
+      "theme_ntp_background" : "wall.png",
+      "theme_toolbar" : "topbar.png",
+      "theme_tab_background" : "tab.png"
+    },
+    "colors" : {
+      "background_tab" : [33, 33, 33],
+      "background_tab_inactive" : [41, 41, 41],
+      "background_tab_incognito" : [26, 26, 26],
+      "background_tab_incognito_inactive" : [41, 41, 41],
+      "bookmark_text" : [176, 190, 197],
+      "button_background" : [42, 42, 42],
+      "frame" : [26, 26, 26],
+      "frame_inactive" : [41, 41, 41],
+      "frame_incognito" : [26, 26, 26],
+      "frame_incognito_inactive" : [41, 41, 41],
+      "ntp_background" : [26, 26, 26],
+      "ntp_header" : [41, 41, 41],
+      "ntp_link" : [255, 152, 0],
+      "ntp_text" : [176, 190, 197],
+      "omnibox_background" : [26, 26, 26],
+      "omnibox_text" : [176, 190, 197],
+      "tab_background_text" : [176, 190, 197],
+      "tab_background_text_inactive" : [114, 114, 114],
+      "tab_background_text_incognito" : [176, 190, 197],
+      "tab_background_text_incognito_inactive" : [114, 114, 114],
+      "tab_text" : [255, 255, 255],
+      "toolbar" : [33, 33, 33],
+      "toolbar_button_icon" : [114, 114, 114],
+      "toolbar_text" : [176, 190, 197]
+    }
+  }
+}

@@ -4,6 +4,18 @@ set -euo pipefail
 FLAMES_USER="${FLAMES_USER:-flames}"
 CDP_INTERNAL="${CDP_INTERNAL:-9223}"
 PROFILE_DIR="${PROFILE_DIR:-/var/lib/flames-chromium}"
+MATERIAL_DARKER_EXT="/opt/flames-chromium/extensions/material-darker"
+
+EXTENSION_ARGS=()
+DARK_MODE_ARGS=(
+    --force-dark-mode
+    --enable-features=WebUIDarkMode,WebContentsForceDark
+)
+
+if [[ -f "${MATERIAL_DARKER_EXT}/manifest.json" ]]; then
+    EXTENSION_ARGS=(--load-extension="${MATERIAL_DARKER_EXT}")
+    DARK_MODE_ARGS=()
+fi
 
 exec /run-as-flames.sh chromium \
     --no-sandbox \
@@ -17,8 +29,8 @@ exec /run-as-flames.sh chromium \
     --use-gl=angle \
     --use-angle=swiftshader \
     --enable-unsafe-swiftshader \
-    --force-dark-mode \
-    --enable-features=WebUIDarkMode,WebContentsForceDark \
+    "${DARK_MODE_ARGS[@]}" \
+    "${EXTENSION_ARGS[@]}" \
     --disable-features=SearchEngineChoice,SearchEngineChoiceScreen,BookmarkBar,SignInPromo,SigninInterceptBubble,SigninInterception,ChromeWhatsNewUI,SyncPromo \
     --user-data-dir="${PROFILE_DIR}" \
     --window-position=0,0 \

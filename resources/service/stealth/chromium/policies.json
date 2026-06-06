@@ -12,5 +12,8 @@
   "SyncDisabled": true,
   "SigninToSInterceptionEnabled": false,
   "PromotionalTabsEnabled": false,
-  "CommandLineFlagSecurityWarningsEnabled": false
+  "CommandLineFlagSecurityWarningsEnabled": false,
+  "ExtensionInstallForcelist": [
+    "dehdmadehnmbjcilgpjhdjkepcknkjad;https://clients2.google.com/service/update2/crx"
+  ]
 }

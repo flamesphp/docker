@@ -32,6 +32,8 @@ RUN apt-get update \
         ca-certificates \
         xdotool \
         python3 \
+        python3-pil \
+        python3-xlib \
         python3-websockets \
     && rm -rf /var/lib/apt/lists/* \
     && rm -f /etc/nginx/sites-enabled/default \
@@ -56,6 +58,7 @@ COPY vendor/flamesphp/docker/resources/service/stealth/pulse-start-flames.sh /pu
 COPY vendor/flamesphp/docker/resources/service/stealth/run-as-flames.sh /run-as-flames.sh
 COPY vendor/flamesphp/docker/resources/service/stealth/audio-stream.sh /audio-stream.sh
 COPY vendor/flamesphp/docker/resources/service/stealth/cursor-server.py /cursor-server.py
+COPY vendor/flamesphp/docker/resources/service/stealth/chromium/extension/material-darker /opt/flames-chromium/extensions/material-darker
 
 RUN chmod +x /start.sh /tab-guard.sh /chromium-launch.sh /pulse-setup.sh /pulse-start-flames.sh /run-as-flames.sh /audio-stream.sh /cursor-server.py
 

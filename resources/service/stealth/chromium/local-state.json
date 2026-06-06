@@ -1,0 +1,8 @@
+{
+  "signin": {
+    "allowed": false
+  },
+  "browser": {
+    "signin_promo_show_count": 999
+  }
+}

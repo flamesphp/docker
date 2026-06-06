@@ -1,0 +1,5 @@
+.fail
+
+load-module module-native-protocol-unix auth-anonymous=1
+load-module module-null-sink sink_name=flames_chromium_audio sink_properties=device.description="Flames Chromium Audio"
+.set-default-sink flames_chromium_audio

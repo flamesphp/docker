@@ -1,0 +1,40 @@
+#!/bin/bash
+set -euo pipefail
+
+FLAMES_USER="${FLAMES_USER:-flames}"
+FLAMES_HOME="${FLAMES_HOME:-/home/flames}"
+PULSE_RUNTIME="${PULSE_RUNTIME:-${FLAMES_HOME}/.runtime/pulse}"
+PULSE_SINK_NAME="${PULSE_SINK_NAME:-flames_chromium_audio}"
+PULSE_SOCKET="${PULSE_RUNTIME}/pulse/native"
+SESSION_ENV="${FLAMES_SESSION_ENV:-${PULSE_RUNTIME}/session.env}"
+DBUS_ENV="${PULSE_RUNTIME}/dbus.env"
+
+mkdir -p "${PULSE_RUNTIME}"
+chown "${FLAMES_USER}:${FLAMES_USER}" "${PULSE_RUNTIME}"
+chmod 700 "${PULSE_RUNTIME}"
+
+runuser -u "${FLAMES_USER}" -- env \
+    HOME="${FLAMES_HOME}" \
+    XDG_RUNTIME_DIR="${PULSE_RUNTIME}" \
+    PULSE_SINK_NAME="${PULSE_SINK_NAME}" \
+    /pulse-start-flames.sh
+
+DBUS_SESSION_BUS_ADDRESS=""
+if [ -f "${DBUS_ENV}" ]; then
+    # shellcheck disable=SC1090
+    source "${DBUS_ENV}"
+fi
+
+cat > "${SESSION_ENV}" <<SESSION
+HOME=${FLAMES_HOME}
+XDG_RUNTIME_DIR=${PULSE_RUNTIME}
+PULSE_SERVER=unix:${PULSE_SOCKET}
+DISPLAY=:99
+DBUS_SESSION_BUS_ADDRESS=${DBUS_SESSION_BUS_ADDRESS}
+SESSION
+
+chown "${FLAMES_USER}:${FLAMES_USER}" "${SESSION_ENV}"
+chmod 600 "${SESSION_ENV}"
+
+export PULSE_SERVER="unix:${PULSE_SOCKET}"
+export XDG_RUNTIME_DIR="${PULSE_RUNTIME}"

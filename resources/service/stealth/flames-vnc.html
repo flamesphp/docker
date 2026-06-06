@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Flames: Stealth (__CDP_PORT__)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #111;
+        }
+
+        #screen {
+            width: 100%;
+            height: 100%;
+            outline: none;
+        }
+    </style>
+    <script type="module">
+        import RFB from './core/rfb.js';
+
+        const XK_CONTROL_L = 0xffe3;
+        const XK_V = 0x0076;
+
+        const params = new URLSearchParams(window.location.search);
+        const path = params.get('path') || 'websockify';
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const url = `${protocol}//${window.location.host}/${path.replace(/^\//, '')}`;
+
+        const screen = document.getElementById('screen');
+        screen.tabIndex = 0;
+
+        const rfb = new RFB(screen, url, { shared: true });
+
+        rfb.scaleViewport = true;
+        rfb.resizeSession = true;
+        rfb.focusOnClick = true;
+        rfb.clipViewport = false;
+
+        let lastHostClipboard = '';
+        let rfbReady = false;
+
+        const delay = (ms) => new Promise((resolve) => window.setTimeout(resolve, ms));
+
+        const sendCtrlChord = async (keysym, code) => {
+            rfb.sendKey(XK_CONTROL_L, 'ControlLeft', true);
+            await delay(20);
+            rfb.sendKey(keysym, code, true);
+            await delay(20);
+            rfb.sendKey(keysym, code, false);
+            await delay(20);
+            rfb.sendKey(XK_CONTROL_L, 'ControlLeft', false);
+        };
+
+        const pushHostClipboard = async (force = false) => {
+            try {
+                const text = await navigator.clipboard.readText();
+                if (!text) {
+                    return false;
+                }
+                if (!force && text === lastHostClipboard) {
+                    return true;
+                }
+                lastHostClipboard = text;
+                rfb.clipboardPasteFrom(text);
+                return true;
+            } catch (error) {
+                console.warn('Flames clipboard: host → remote failed', error);
+                return false;
+            }
+        };
+
+        const pullRemoteClipboard = async (text) => {
+            if (!text) {
+                return;
+            }
+            try {
+                await navigator.clipboard.writeText(text);
+                lastHostClipboard = text;
+            } catch (error) {
+                console.warn('Flames clipboard: remote → host failed', error);
+            }
+        };
+
+        const pasteFromHost = async () => {
+            if (!rfbReady) {
+                return;
+            }
+            const synced = await pushHostClipboard(true);
+            if (!synced) {
+                return;
+            }
+            await delay(120);
+            await sendCtrlChord(XK_V, 'KeyV');
+        };
+
+        rfb.addEventListener('connect', () => {
+            rfbReady = true;
+            screen.focus();
+            pushHostClipboard(true);
+        });
+
+        rfb.addEventListener('disconnect', () => {
+            rfbReady = false;
+        });
+
+        rfb.addEventListener('clipboard', (event) => {
+            pullRemoteClipboard(event.detail.text);
+        });
+
+        screen.addEventListener('mousedown', () => {
+            pushHostClipboard(true);
+        });
+
+        document.addEventListener('keydown', async (event) => {
+            if (!rfbReady) {
+                return;
+            }
+
+            const key = event.key.toLowerCase();
+            const mod = event.ctrlKey || event.metaKey;
+
+            if (mod && key === 'v') {
+                event.preventDefault();
+                event.stopPropagation();
+                await pasteFromHost();
+            }
+        }, true);
+
+        document.addEventListener('paste', async (event) => {
+            if (!rfbReady) {
+                return;
+            }
+            event.preventDefault();
+            const text = event.clipboardData?.getData('text')
+                || await navigator.clipboard.readText().catch(() => '');
+            if (!text) {
+                return;
+            }
+            lastHostClipboard = text;
+            rfb.clipboardPasteFrom(text);
+            await delay(120);
+            await sendCtrlChord(XK_V, 'KeyV');
+        }, true);
+
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') {
+                pushHostClipboard(true);
+            }
+        });
+    </script>
+</head>
+<body>
+    <div id="screen"></div>
+</body>
+</html>

@@ -1,0 +1,28 @@
+services:
+  stealth:
+    build:
+      context: .
+      dockerfile: vendor/flamesphp/docker/resources/service/stealth/Dockerfile
+    restart: unless-stopped
+    shm_size: 2gb
+    environment:
+      STEALTH_REMOTE_PORT: ${STEALTH_REMOTE_PORT:-9222}
+      STEALTH_VNC_PORT: ${STEALTH_VNC_PORT:-5900}
+      STEALTH_VNC_WEBVIEW_PORT: ${STEALTH_VNC_WEBVIEW_PORT:-6080}
+      STEALTH_AUDIO_PORT: ${STEALTH_AUDIO_PORT:-8090}
+    ports:
+      - "${STEALTH_REMOTE_PORT:-${STEALTH_REMOTE_PORT_FORWARDED:-9222}}:9222"
+      - "${STEALTH_VNC_PORT:-${STEALTH_VNC_PORT_FORWARDED:-5900}}:5900"
+      - "${STEALTH_VNC_WEBVIEW_PORT:-${STEALTH_VNC_WEBVIEW_PORT_FORWARDED:-6080}}:${STEALTH_VNC_WEBVIEW_PORT:-6080}"
+    networks:
+      - flames
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:9222/json/version | grep -q Browser"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s

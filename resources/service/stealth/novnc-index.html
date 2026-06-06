@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Flames: Stealth (__CDP_PORT__)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #111;
+        }
+
+        #screen {
+            position: fixed;
+            inset: 0;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            outline: none;
+            background: #000;
+        }
+
+        #screen canvas {
+            display: block;
+            margin: 0 auto;
+        }
+    </style>
+    <script type="module">
+        import RFB from './core/rfb.js';
+
+        const XK_CONTROL_L = 0xffe3;
+        const XK_V = 0x0076;
+
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const url = `${protocol}//${window.location.host}/websockify`;
+
+        const screen = document.getElementById('screen');
+        screen.tabIndex = 0;
+
+        const rfb = new RFB(screen, url, { shared: true });
+
+        rfb.scaleViewport = true;
+        rfb.resizeSession = false;
+        rfb.focusOnClick = true;
+        rfb.clipViewport = true;
+
+        let lastHostClipboard = '';
+        let rfbReady = false;
+
+        const delay = (ms) => new Promise((resolve) => window.setTimeout(resolve, ms));
+
+        const sendCtrlChord = async (keysym, code) => {
+            rfb.sendKey(XK_CONTROL_L, 'ControlLeft', true);
+            await delay(20);
+            rfb.sendKey(keysym, code, true);
+            await delay(20);
+            rfb.sendKey(keysym, code, false);
+            await delay(20);
+            rfb.sendKey(XK_CONTROL_L, 'ControlLeft', false);
+        };
+
+        const pushHostClipboard = async (force = false) => {
+            try {
+                const text = await navigator.clipboard.readText();
+                if (!text) {
+                    return false;
+                }
+                if (!force && text === lastHostClipboard) {
+                    return true;
+                }
+                lastHostClipboard = text;
+                rfb.clipboardPasteFrom(text);
+                return true;
+            } catch (error) {
+                console.warn('Flames clipboard: host → remote failed', error);
+                return false;
+            }
+        };
+
+        const pullRemoteClipboard = async (text) => {
+            if (!text) {
+                return;
+            }
+            try {
+                await navigator.clipboard.writeText(text);
+                lastHostClipboard = text;
+            } catch (error) {
+                console.warn('Flames clipboard: remote → host failed', error);
+            }
+        };
+
+        const pasteFromHost = async () => {
+            if (!rfbReady) {
+                return;
+            }
+            const synced = await pushHostClipboard(true);
+            if (!synced) {
+                return;
+            }
+            await delay(120);
+            await sendCtrlChord(XK_V, 'KeyV');
+        };
+
+        rfb.addEventListener('connect', () => {
+            rfbReady = true;
+            screen.focus();
+            pushHostClipboard(true);
+        });
+
+        rfb.addEventListener('disconnect', () => {
+            rfbReady = false;
+        });
+
+        rfb.addEventListener('clipboard', (event) => {
+            pullRemoteClipboard(event.detail.text);
+        });
+
+        screen.addEventListener('mousedown', () => {
+            pushHostClipboard(true);
+        });
+
+        document.addEventListener('keydown', async (event) => {
+            if (!rfbReady) {
+                return;
+            }
+
+            const key = event.key.toLowerCase();
+            const mod = event.ctrlKey || event.metaKey;
+
+            if (mod && key === 'v') {
+                event.preventDefault();
+                event.stopPropagation();
+                await pasteFromHost();
+            }
+        }, true);
+
+        document.addEventListener('paste', async (event) => {
+            if (!rfbReady) {
+                return;
+            }
+            event.preventDefault();
+            const text = event.clipboardData?.getData('text')
+                || await navigator.clipboard.readText().catch(() => '');
+            if (!text) {
+                return;
+            }
+            lastHostClipboard = text;
+            rfb.clipboardPasteFrom(text);
+            await delay(120);
+            await sendCtrlChord(XK_V, 'KeyV');
+        }, true);
+
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') {
+                pushHostClipboard(true);
+            }
+        });
+
+        const audioStreamUrl = `${window.location.origin}/audio/stream`;
+        const PCM_SAMPLE_RATE = 48000;
+        const PCM_CHANNELS = 2;
+        const PCM_BYTES_PER_SAMPLE = 2;
+        const PCM_FRAME_BYTES = PCM_CHANNELS * PCM_BYTES_PER_SAMPLE;
+        const PCM_BUFFER_SECONDS = 0.12;
+
+        let audioStarting = false;
+        let audioStarted = false;
+        let pcmAbort = null;
+        let pcmContext = null;
+        let pcmNextStart = 0;
+
+        const stopAudio = async () => {
+            pcmAbort?.abort();
+            pcmAbort = null;
+            pcmNextStart = 0;
+
+            if (pcmContext) {
+                const context = pcmContext;
+                pcmContext = null;
+                await context.close().catch(() => {});
+            }
+        };
+
+        const schedulePcmChunk = (chunk) => {
+            if (!pcmContext || chunk.length < PCM_FRAME_BYTES) {
+                return;
+            }
+
+            const frames = Math.floor(chunk.length / PCM_FRAME_BYTES);
+            const usableBytes = frames * PCM_FRAME_BYTES;
+            const buffer = pcmContext.createBuffer(PCM_CHANNELS, frames, PCM_SAMPLE_RATE);
+            const view = new DataView(chunk.buffer, chunk.byteOffset, usableBytes);
+
+            for (let channel = 0; channel < PCM_CHANNELS; channel += 1) {
+                const channelData = buffer.getChannelData(channel);
+                for (let frame = 0; frame < frames; frame += 1) {
+                    const sample = view.getInt16((frame * PCM_CHANNELS + channel) * PCM_BYTES_PER_SAMPLE, true);
+                    channelData[frame] = sample / 32768;
+                }
+            }
+
+            const source = pcmContext.createBufferSource();
+            source.buffer = buffer;
+            source.connect(pcmContext.destination);
+
+            if (pcmNextStart < pcmContext.currentTime - 0.25) {
+                pcmNextStart = pcmContext.currentTime + PCM_BUFFER_SECONDS;
+            }
+
+            const startAt = Math.max(pcmContext.currentTime + PCM_BUFFER_SECONDS, pcmNextStart);
+            source.start(startAt);
+            pcmNextStart = startAt + buffer.duration;
+        };
+
+        const pumpPcmStream = async (signal) => {
+            const response = await fetch(`${audioStreamUrl}?t=${Date.now()}`, { signal });
+            if (!response.ok || !response.body) {
+                throw new Error(`Audio stream unavailable (${response.status})`);
+            }
+
+            const reader = response.body.getReader();
+            let pending = new Uint8Array(0);
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) {
+                    break;
+                }
+
+                const merged = new Uint8Array(pending.length + value.length);
+                merged.set(pending);
+                merged.set(value, pending.length);
+
+                const usableBytes = Math.floor(merged.length / PCM_FRAME_BYTES) * PCM_FRAME_BYTES;
+                if (usableBytes > 0) {
+                    schedulePcmChunk(merged.subarray(0, usableBytes));
+                    pending = merged.subarray(usableBytes);
+                } else {
+                    pending = merged;
+                }
+            }
+        };
+
+        const startAudio = async () => {
+            if (audioStarting || audioStarted) {
+                return;
+            }
+
+            audioStarting = true;
+
+            try {
+                pcmAbort = new AbortController();
+                pcmContext = new AudioContext({
+                    latencyHint: 'interactive',
+                    sampleRate: PCM_SAMPLE_RATE,
+                });
+                pcmNextStart = pcmContext.currentTime + PCM_BUFFER_SECONDS;
+
+                if (pcmContext.state === 'suspended') {
+                    await pcmContext.resume();
+                }
+
+                pumpPcmStream(pcmAbort.signal).catch((error) => {
+                    if (error.name === 'AbortError') {
+                        return;
+                    }
+                    console.warn('Flames audio: stream ended', error);
+                    audioStarted = false;
+                    stopAudio();
+                });
+
+                audioStarted = true;
+            } catch (error) {
+                console.warn('Flames audio: playback failed', error);
+                audioStarted = false;
+                await stopAudio();
+            } finally {
+                audioStarting = false;
+            }
+        };
+
+        document.addEventListener('pointerdown', () => {
+            startAudio();
+        }, { once: true });
+    </script>
+</head>
+<body>
+    <div id="screen"></div>
+</body>
+</html>

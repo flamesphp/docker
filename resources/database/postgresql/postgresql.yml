@@ -1,6 +1,9 @@
 services:
   postgresql:
-    image: postgres:18.4
+    # pgvector + PostGIS on Debian trixie (matches postgres:18 collation/glibc)
+    build:
+      context: .
+      dockerfile: vendor/flamesphp/docker/resources/database/postgresql/Dockerfile
     restart: unless-stopped
     command: >
       postgres
@@ -16,6 +19,7 @@ services:
     volumes:
       - postgresql:/var/lib/postgresql/18/data
       - ./vendor/flamesphp/docker/resources/database/postgresql/postgresql.conf:/etc/postgresql/flames.conf:ro
+      - ./vendor/flamesphp/docker/resources/database/postgresql/init/01-vector.sh:/docker-entrypoint-initdb.d/01-vector.sh:ro
     networks:
       - flames
     ulimits:

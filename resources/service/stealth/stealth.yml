@@ -16,6 +16,8 @@ services:
       - "${STEALTH_REMOTE_PORT:-${STEALTH_REMOTE_PORT_FORWARDED:-9222}}:9222"
       - "${STEALTH_VNC_PORT:-${STEALTH_VNC_PORT_FORWARDED:-5900}}:5900"
       - "${STEALTH_VNC_WEBVIEW_PORT:-${STEALTH_VNC_WEBVIEW_PORT_FORWARDED:-6080}}:${STEALTH_VNC_WEBVIEW_PORT:-6080}"
+    volumes:
+      - stealth-chromium-profile:/var/lib/flames-chromium
     networks:
       - flames
     ulimits:
@@ -28,3 +30,6 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+
+volumes:
+  stealth-chromium-profile:

@@ -76,9 +76,14 @@ socat "TCP4-LISTEN:${CDP_EXTERNAL},fork,reuseaddr" "TCP4:127.0.0.1:${CDP_INTERNA
 
 PROFILE_DIR=/var/lib/flames-chromium
 mkdir -p "${PROFILE_DIR}/Default"
-cp /opt/flames-chromium/Default/Preferences "${PROFILE_DIR}/Default/Preferences"
-cp /opt/flames-chromium/Default/Bookmarks "${PROFILE_DIR}/Default/Bookmarks"
-cp /opt/flames-chromium/local-state.json "${PROFILE_DIR}/Local State"
+
+if [[ ! -f "${PROFILE_DIR}/.flames-profile-initialized" ]]; then
+    cp /opt/flames-chromium/Default/Preferences "${PROFILE_DIR}/Default/Preferences"
+    cp /opt/flames-chromium/Default/Bookmarks "${PROFILE_DIR}/Default/Bookmarks"
+    cp /opt/flames-chromium/local-state.json "${PROFILE_DIR}/Local State"
+    touch "${PROFILE_DIR}/.flames-profile-initialized"
+fi
+
 /chromium-profile-cleanup.sh "${PROFILE_DIR}"
 chown -R "${FLAMES_USER}:${FLAMES_USER}" "${PROFILE_DIR}"
 

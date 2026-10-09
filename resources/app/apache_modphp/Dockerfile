@@ -42,6 +42,9 @@ RUN apt-get install -y --no-install-recommends php8.5-zip
 RUN echo "Kernel: Install MongoDB extension"
 RUN apt-get install -y --no-install-recommends php8.5-mongodb
 
+RUN echo "Kernel: Install Redis extension"
+RUN apt-get install -y --no-install-recommends php8.5-redis
+
 RUN echo "Kernel: Generate self-signed certificate"
 RUN openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
     -keyout /etc/ssl/private/flames-selfsigned.key \

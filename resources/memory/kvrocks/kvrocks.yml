@@ -1,0 +1,37 @@
+services:
+  kvrocks:
+    image: apache/kvrocks:2.15.0
+    restart: unless-stopped
+    entrypoint:
+      - kvrocks
+      - -c
+      - /etc/kvrocks/flames.conf
+      - --dir
+      - /var/lib/kvrocks
+      - --pidfile
+      - /var/run/kvrocks/kvrocks.pid
+      - --bind
+      - 0.0.0.0
+    command: >
+      --requirepass ${DATABASE_MEMORY_KVROCKS_PASSWORD}
+      --maxmemory ${DATABASE_MEMORY_KVROCKS_MAX_MEMORY:-256mb}
+    ports:
+      - "${DATABASE_MEMORY_KVROCKS_PORT:-${DATABASE_MEMORY_KVROCKS_PORT_FORWARDED:-6666}}:6666"
+    volumes:
+      - kvrocks:/var/lib/kvrocks
+      - ./vendor/flamesphp/docker/resources/memory/kvrocks/kvrocks.conf:/etc/kvrocks/flames.conf:ro
+    networks:
+      - flames
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    healthcheck:
+      test: ["CMD", "redis-cli", "-p", "6666", "-a", "${DATABASE_MEMORY_KVROCKS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+volumes:
+  kvrocks:

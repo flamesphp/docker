@@ -13,7 +13,7 @@ namespace Flames\Docker;
 final class ExposePort
 {
     /** @var array<string, string> */
-    private const PREFIX_TO_SERVICE = [
+    private const array PREFIX_TO_SERVICE = [
         'DATABASE_MYSQL'                  => 'mysql',
         'DATABASE_MARIADB'                => 'mariadb',
         'DATABASE_POSTGRESQL'             => 'postgresql',
@@ -22,7 +22,7 @@ final class ExposePort
         'DATABASE_MEMORY_REDIS'           => 'redis',
         'DATABASE_MEMORY_DRAGONFLY'      => 'dragonfly',
         'DATABASE_MEMORY_VALKEY'          => 'valkey',
-        'DATABASE_MEMORY_ROCKSDB'        => 'rocksdb',
+        'DATABASE_MEMORY_KVROCKS'         => 'kvrocks',
         'DATABASE_SEARCH_MEILISEARCH'     => 'meilisearch',
         'DATABASE_SEARCH_OPENSEARCH'      => 'opensearch',
         'DATABASE_SEARCH_ELASTICSEARCH'   => 'elasticsearch',

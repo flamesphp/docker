@@ -12,6 +12,7 @@ AI-oriented reference for the **flamesphp/docker** package. Use this file when v
 | Memory stores | `resources/memory/` | Redis, KeyDB, Valkey, Dragonfly, Kvrocks |
 | Search | `resources/search/` | Meilisearch, OpenSearch, Elasticsearch |
 | Stealth service | `resources/service/stealth/` | Headless Chromium + noVNC + cursor overlay for remote browser automation |
+| SonarQube service | `resources/service/sonarqube/` | SonarQube Community Build + dedicated PostgreSQL for code quality analysis |
 
 **Composer package:** `flamesphp/docker` (PHP `>=8.5`, MIT).
 
